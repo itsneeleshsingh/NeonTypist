@@ -14,7 +14,7 @@ import { recordMatchResult, getStoredStats, computeRankTier } from '../utils/sto
 import { ParticleBurst } from '../components/ParticleBurst';
 
 const MAX_SHIELDS = 5;
-const FIREWALL_THRESHOLD_Y = 86; // 86% height is the firewall line
+const FIREWALL_THRESHOLD_Y = 86; // 86% height is the defense line
 
 export const Game = () => {
   const location = useLocation();
@@ -174,13 +174,13 @@ export const Game = () => {
       const timer = setTimeout(() => {
         playKeyStrokeSound();
         setCountdown((prev) => prev - 1);
-      }, 800);
+      }, 750);
       return () => clearTimeout(timer);
     } else {
       setGameState('playing');
       lastSpawnTimeRef.current = performance.now();
       
-      // Initialize with initial falling words so screen is immediately active!
+      // Initialize with initial falling words
       const initialWord1 = getRandomWord(difficulty, []);
       const initialWord2 = getRandomWord(difficulty, [initialWord1]);
       setActiveWords([
@@ -229,7 +229,7 @@ export const Game = () => {
     }
   }, [mode, wordsNeutralized, gameState]);
 
-  // Main 60fps Game Animation Frame Loop (Stable & decoupled from re-renders)
+  // Main 60fps Game Animation Frame Loop
   useEffect(() => {
     if (gameState !== 'playing') return;
 
@@ -240,7 +240,7 @@ export const Game = () => {
 
     const gameLoop = (currentTime) => {
       const now = currentTime || performance.now();
-      const deltaTime = Math.min((now - lastTime) / 16.67, 3); // Normalize to ~60fps and clamp
+      const deltaTime = Math.min((now - lastTime) / 16.67, 3);
       lastTime = now;
 
       const config = configRef.current;
@@ -253,7 +253,7 @@ export const Game = () => {
         lastSpawnTimeRef.current = now;
       }
 
-      // Update positions and check firewall breaches
+      // Update positions and check defense line breaches
       setActiveWords((prevWords) => {
         const survivingWords = [];
         let breached = false;
@@ -262,10 +262,8 @@ export const Game = () => {
           const newY = word.y + (word.speed * deltaTime);
 
           if (newY >= FIREWALL_THRESHOLD_Y) {
-            // Firewall breached!
             breached = true;
             playShieldLost();
-            // Particle burst at breach point
             setParticleBursts((prev) => [
               ...prev,
               { id: 'breach_' + Date.now(), x: word.x, y: FIREWALL_THRESHOLD_Y, color: 'rose' }
@@ -279,9 +277,8 @@ export const Game = () => {
           setShields((currentShields) => {
             const nextShields = currentShields - 1;
             setFirewallAlarm(true);
-            setTimeout(() => setFirewallAlarm(false), 600);
+            setTimeout(() => setFirewallAlarm(false), 500);
 
-            // Break streak on shield loss
             setStreak(0);
             setComboMultiplier(1);
 
@@ -311,7 +308,6 @@ export const Game = () => {
     playKeyStrokeSound();
     setInputText(value);
 
-    // Track total keystrokes
     if (value.length > inputText.length) {
       setTotalKeystrokes((prev) => prev + 1);
     }
@@ -319,7 +315,6 @@ export const Game = () => {
     const trimmed = value.trim().toLowerCase();
     if (!trimmed) return;
 
-    // Check if user has completely matched an active word
     const exactMatchIndex = activeWords.findIndex(
       (w) => w.text.toLowerCase() === trimmed
     );
@@ -350,7 +345,6 @@ export const Game = () => {
       if (matchIndex !== -1) {
         neutralizeWord(matchIndex, trimmed);
       } else {
-        // Miss / Error submit
         playErrorBuzz();
         setInputShaking(true);
         setTimeout(() => setInputShaking(false), 300);
@@ -366,7 +360,6 @@ export const Game = () => {
     const word = activeWords[index];
     if (!word) return;
 
-    // Audio & Particle FX
     playLaserZap(comboMultiplier);
     setParticleBursts((prev) => [
       ...prev,
@@ -378,7 +371,6 @@ export const Game = () => {
       }
     ]);
 
-    // Update streak and combo multiplier
     const nextStreak = streak + 1;
     setStreak(nextStreak);
     setMaxStreak((prev) => Math.max(prev, nextStreak));
@@ -394,15 +386,12 @@ export const Game = () => {
     }
     setComboMultiplier(nextMultiplier);
 
-    // Calculate score
     const pointsGained = word.points * nextMultiplier;
     setScore((prev) => prev + pointsGained);
     setWordsNeutralized((prev) => prev + 1);
 
-    // Keystroke statistics
     setCorrectKeystrokes((prev) => prev + typedWord.length + 1);
 
-    // Remove word from active list and clear input
     setActiveWords((prev) => prev.filter((_, i) => i !== index));
     setInputText('');
   };
@@ -436,13 +425,9 @@ export const Game = () => {
   return (
     <div className="relative w-full h-[calc(100vh-4rem)] flex flex-col bg-[#07080d] overflow-hidden select-none">
       
-      {/* Background Cyber Grid */}
-      <div className="absolute inset-0 cyber-grid-dense opacity-40 pointer-events-none" />
-      <div className="absolute inset-0 scanlines opacity-60 pointer-events-none" />
-
-      {/* Screen-wide Firewall Alarm Flash */}
+      {/* Screen-wide Alarm Flash */}
       {firewallAlarm && (
-        <div className="absolute inset-0 bg-rose-600/20 z-40 pointer-events-none animate-pulse transition-opacity duration-300" />
+        <div className="absolute inset-0 bg-rose-600/15 z-40 pointer-events-none transition-opacity duration-300" />
       )}
 
       {/* Particle Bursts Layer */}
@@ -457,58 +442,56 @@ export const Game = () => {
       ))}
 
       {/* TOP HUD BAR */}
-      <div className="relative z-20 bg-slate-950/90 border-b border-slate-800/90 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs font-mono backdrop-blur-md">
+      <div className="relative z-20 bg-slate-950/90 border-b border-slate-800/80 px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs font-mono backdrop-blur-md">
         
-        {/* Left Telemetry (Score & Multiplier) */}
+        {/* Left Telemetry */}
         <div className="flex items-center gap-4">
-          
           <div className="flex items-center gap-2">
-            <span className="text-slate-500 uppercase tracking-widest text-[10px]">SCORE</span>
-            <span className="text-lg font-black text-white font-mono tracking-wider">
+            <span className="text-slate-400 uppercase text-[11px]">Score</span>
+            <span className="text-base font-bold text-white font-mono">
               {score.toLocaleString()}
             </span>
           </div>
 
           <div className={`px-2.5 py-0.5 rounded-full border text-xs font-bold transition-all duration-300 ${
             comboMultiplier >= 4
-              ? 'bg-rose-950/60 border-rose-500 text-rose-300 shadow-[0_0_15px_rgba(244,63,94,0.5)] animate-pulse'
+              ? 'bg-rose-950/60 border-rose-500 text-rose-300 shadow-[0_0_15px_rgba(244,63,94,0.4)]'
               : comboMultiplier >= 2
-              ? 'bg-cyan-950/60 border-cyan-500 text-cyan-300 shadow-[0_0_10px_rgba(0,240,255,0.4)]'
-              : 'bg-slate-900 border-slate-700 text-slate-400'
+              ? 'bg-cyan-950/60 border-cyan-500 text-cyan-300 shadow-[0_0_10px_rgba(0,240,255,0.3)]'
+              : 'bg-slate-900 border-slate-800 text-slate-400'
           }`}>
-            {comboMultiplier}x COMBO {streak > 0 && `(${streak})`}
+            {comboMultiplier}x Combo {streak > 0 && `(${streak})`}
           </div>
-
         </div>
 
-        {/* Center Live WPM & Accuracy */}
+        {/* Center Metrics */}
         <div className="flex items-center gap-4 sm:gap-6 bg-slate-900/80 px-3.5 py-1 rounded-lg border border-slate-800">
           
           <div className="flex items-center gap-1.5">
-            <span className="text-slate-400 text-[10px] uppercase">WPM:</span>
+            <span className="text-slate-400 text-[11px]">WPM:</span>
             <span className="text-cyan-400 font-bold text-sm font-mono">{currentWpm}</span>
           </div>
 
-          <div className="w-[1px] h-3 bg-slate-700" />
+          <div className="w-[1px] h-3 bg-slate-800" />
 
           <div className="flex items-center gap-1.5">
-            <span className="text-slate-400 text-[10px] uppercase">ACC:</span>
+            <span className="text-slate-400 text-[11px]">Acc:</span>
             <span className="text-emerald-400 font-bold text-sm font-mono">{currentAccuracy}%</span>
           </div>
 
-          <div className="w-[1px] h-3 bg-slate-700" />
+          <div className="w-[1px] h-3 bg-slate-800" />
 
           <div className="flex items-center gap-1.5">
-            <span className="text-slate-400 text-[10px] uppercase">PURGED:</span>
+            <span className="text-slate-400 text-[11px]">Cleared:</span>
             <span className="text-purple-400 font-bold text-sm font-mono">{wordsNeutralized}</span>
           </div>
 
           {mode === 'time_attack' && (
             <>
-              <div className="w-[1px] h-3 bg-slate-700" />
+              <div className="w-[1px] h-3 bg-slate-800" />
               <div className="flex items-center gap-1.5">
-                <span className="text-slate-400 text-[10px] uppercase">TIME:</span>
-                <span className={`font-bold text-sm font-mono ${timeRemaining <= 10 ? 'text-rose-400 animate-ping' : 'text-amber-400'}`}>
+                <span className="text-slate-400 text-[11px]">Time:</span>
+                <span className={`font-bold text-sm font-mono ${timeRemaining <= 10 ? 'text-rose-400 animate-pulse' : 'text-amber-400'}`}>
                   {timeRemaining}s
                 </span>
               </div>
@@ -517,9 +500,9 @@ export const Game = () => {
 
           {mode === 'word_rush' && (
             <>
-              <div className="w-[1px] h-3 bg-slate-700" />
+              <div className="w-[1px] h-3 bg-slate-800" />
               <div className="flex items-center gap-1.5">
-                <span className="text-slate-400 text-[10px] uppercase">GOAL:</span>
+                <span className="text-slate-400 text-[11px]">Goal:</span>
                 <span className="text-amber-400 font-bold text-sm font-mono">{wordsNeutralized}/40</span>
               </div>
             </>
@@ -530,9 +513,8 @@ export const Game = () => {
         {/* Right Defensive Shields & Pause */}
         <div className="flex items-center gap-4">
           
-          {/* Shields Integrity */}
           <div className="flex items-center gap-1.5">
-            <span className="text-slate-500 uppercase text-[10px] tracking-wider hidden sm:inline">SHIELDS:</span>
+            <span className="text-slate-400 text-[11px] hidden sm:inline">Shields:</span>
             <div className="flex items-center gap-1">
               {Array.from({ length: MAX_SHIELDS }).map((_, i) => (
                 <div
@@ -540,7 +522,7 @@ export const Game = () => {
                   className={`w-3.5 h-4.5 rounded-sm transition-all duration-300 ${
                     i < shields
                       ? shields <= 2
-                        ? 'bg-rose-500 shadow-[0_0_8px_#f43f5e] animate-pulse'
+                        ? 'bg-rose-500 shadow-[0_0_8px_#f43f5e]'
                         : 'bg-cyan-400 shadow-[0_0_8px_#00f0ff]'
                       : 'bg-slate-800 border border-slate-700/50'
                   }`}
@@ -549,16 +531,15 @@ export const Game = () => {
             </div>
           </div>
 
-          {/* Pause Button */}
           <button
             type="button"
             onClick={() => {
               playKeyStrokeSound();
               setGameState(gameState === 'playing' ? 'paused' : 'playing');
             }}
-            className="px-2.5 py-1 rounded bg-slate-900 border border-slate-700 hover:border-cyan-400 text-slate-300 hover:text-cyan-300 text-xs font-mono transition-colors"
+            className="px-2.5 py-1 rounded bg-slate-900 border border-slate-700 hover:border-slate-500 text-slate-300 hover:text-white text-xs font-mono transition-colors"
           >
-            {gameState === 'paused' ? 'RESUME' : 'PAUSE'}
+            {gameState === 'paused' ? 'Resume' : 'Pause'}
           </button>
 
         </div>
@@ -576,13 +557,12 @@ export const Game = () => {
           const matchedPart = isTarget ? word.text.substring(0, trimmedInput.length) : '';
           const remainderPart = isTarget ? word.text.substring(trimmedInput.length) : word.text;
 
-          // Tier color styling
           let tierBorder = 'border-cyan-500/40 bg-cyan-950/40 text-cyan-200';
           let glowClass = 'shadow-[0_0_10px_rgba(0,240,255,0.2)]';
 
           if (word.tier === 'tier-3') {
             tierBorder = 'border-purple-500/50 bg-purple-950/40 text-purple-200';
-            glowClass = 'shadow-[0_0_12px_rgba(168,85,247,0.3)]';
+            glowClass = 'shadow-[0_0_12px_rgba(168,85,247,0.25)]';
           } else if (word.tier === 'tier-2') {
             tierBorder = 'border-teal-500/40 bg-teal-950/40 text-teal-200';
             glowClass = 'shadow-[0_0_10px_rgba(20,184,166,0.2)]';
@@ -590,7 +570,7 @@ export const Game = () => {
 
           if (isTarget) {
             tierBorder = 'border-cyan-400 bg-slate-900 text-white ring-2 ring-cyan-400/80';
-            glowClass = 'shadow-[0_0_20px_rgba(0,240,255,0.6)] scale-110';
+            glowClass = 'shadow-[0_0_18px_rgba(0,240,255,0.6)] scale-105';
           }
 
           return (
@@ -603,12 +583,6 @@ export const Game = () => {
                 transform: `translateX(-50%)`
               }}
             >
-              {isTarget && (
-                <span className="text-[10px] text-cyan-400 animate-pulse font-mono tracking-tighter">
-                  [LOCK]
-                </span>
-              )}
-
               {/* Text with prefix match highlighting */}
               <span>
                 {matchedPart && (
@@ -621,23 +595,20 @@ export const Game = () => {
                 </span>
               </span>
 
-              <span className="text-[9px] text-slate-400 font-mono">
+              <span className="text-[10px] text-slate-400 font-mono">
                 +{word.points}
               </span>
             </div>
           );
         })}
 
-        {/* FIREWALL THRESHOLD LINE (BOTTOM DANGER ZONE) */}
+        {/* DEFENSE THRESHOLD LINE (BOTTOM DANGER ZONE) */}
         <div 
-          className="absolute left-0 right-0 z-10 flex items-center justify-between px-4 border-t-2 border-dashed border-rose-500/70 animate-firewall"
+          className="absolute left-0 right-0 z-10 flex items-center justify-between px-4 border-t border-dashed border-rose-500/60"
           style={{ top: `${FIREWALL_THRESHOLD_Y}%` }}
         >
-          <div className="text-[10px] font-mono font-bold tracking-widest uppercase text-rose-400 bg-rose-950/80 px-2 py-0.5 rounded border border-rose-500/50 -mt-3.5">
-            ⚠️ FIREWALL DEFENSE PERIMETER
-          </div>
-          <div className="text-[10px] font-mono tracking-widest text-rose-400 bg-rose-950/80 px-2 py-0.5 rounded border border-rose-500/50 -mt-3.5 hidden sm:block">
-            CRITICAL BREACH THRESHOLD
+          <div className="text-[10px] font-mono tracking-wider uppercase text-rose-400 bg-rose-950/80 px-2 py-0.5 rounded border border-rose-500/40 -mt-3">
+            Defense Line
           </div>
         </div>
 
@@ -645,17 +616,10 @@ export const Game = () => {
 
       {/* BOTTOM INPUT COMMAND DECK */}
       <div className="relative z-20 bg-slate-950/95 border-t border-slate-800 p-4 sm:p-5 backdrop-blur-lg">
-        <div className="max-w-2xl mx-auto space-y-2">
+        <div className="max-w-xl mx-auto space-y-2">
           
           <div className="relative flex items-center">
             
-            {/* Terminal Prompt Indicator */}
-            <div className="absolute left-4 flex items-center gap-1.5 text-cyan-400 font-mono font-bold text-sm pointer-events-none">
-              <span className="animate-pulse">❯</span>
-              <span className="text-slate-500 text-xs hidden sm:inline">INPUT:</span>
-            </div>
-
-            {/* Controlled Text Input Box */}
             <input
               ref={inputRef}
               type="text"
@@ -663,48 +627,44 @@ export const Game = () => {
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
               disabled={gameState !== 'playing'}
-              placeholder={gameState === 'playing' ? 'Type falling word syntax... (Space/Enter to submit)' : 'Terminal offline'}
+              placeholder={gameState === 'playing' ? 'Type falling words... (Space or Enter to submit)' : 'Game paused'}
               autoComplete="off"
               autoCorrect="off"
               autoCapitalize="off"
               spellCheck="false"
-              className={`w-full pl-16 sm:pl-24 pr-20 py-3.5 sm:py-4 bg-slate-900/90 rounded-xl border text-cyan-300 font-mono text-base sm:text-lg tracking-wider focus:outline-none transition-all duration-200 ${
+              className={`w-full px-5 py-3.5 sm:py-4 bg-slate-900/90 rounded-xl border text-cyan-300 font-mono text-base tracking-wider focus:outline-none transition-all duration-200 ${
                 inputShaking
                   ? 'border-rose-500 ring-2 ring-rose-500/50 bg-rose-950/30'
-                  : 'border-cyan-500/40 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-500/40 shadow-[0_0_20px_rgba(0,240,255,0.15)]'
+                  : 'border-slate-700 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-500/50'
               }`}
             />
 
-            {/* Clear / Key Hint */}
             <div className="absolute right-3 flex items-center gap-2 pointer-events-none">
               <span className="hidden sm:inline-block text-[10px] font-mono px-2 py-1 rounded bg-slate-800 text-slate-400 border border-slate-700">
-                SPACE / ENTER
+                Space / Enter
               </span>
             </div>
 
           </div>
 
           <div className="flex items-center justify-between text-[11px] font-mono text-slate-400 px-2">
-            <span>DIFFICULTY: <span className="text-cyan-400 uppercase">{difficulty}</span></span>
-            <span>MODE: <span className="text-purple-400 uppercase">{mode.replace('_', ' ')}</span></span>
-            <span className="hidden sm:inline">PRESS <span className="text-slate-200">ESC</span> TO PAUSE</span>
+            <span>Difficulty: <span className="text-slate-200 capitalize">{difficulty}</span></span>
+            <span>Mode: <span className="text-slate-200 capitalize">{mode.replace('_', ' ')}</span></span>
+            <span className="hidden sm:inline">Press <span className="text-slate-200">Esc</span> to Pause</span>
           </div>
 
         </div>
       </div>
 
-      {/* MODAL: COUNTDOWN OVERLAY */}
+      {/* MODAL: CLEAN COUNTDOWN OVERLAY */}
       {gameState === 'countdown' && (
-        <div className="absolute inset-0 z-50 bg-slate-950/85 backdrop-blur-md flex flex-col items-center justify-center p-4">
-          <div className="text-center space-y-4 animate-scaleUp">
-            <div className="text-xs font-mono uppercase tracking-widest text-cyan-400">
-              INITIALIZING NEURAL LINK...
-            </div>
-            <div className="text-7xl sm:text-9xl font-black font-mono text-transparent bg-gradient-to-br from-cyan-400 to-purple-500 bg-clip-text drop-shadow-[0_0_30px_rgba(0,240,255,0.8)]">
+        <div className="absolute inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex flex-col items-center justify-center p-4">
+          <div className="text-center space-y-3">
+            <div className="text-7xl sm:text-9xl font-black font-mono text-transparent bg-gradient-to-br from-cyan-400 to-purple-500 bg-clip-text drop-shadow-[0_0_30px_rgba(0,240,255,0.6)]">
               {countdown > 0 ? countdown : 'GO!'}
             </div>
-            <p className="text-xs sm:text-sm text-slate-400 font-mono max-w-sm">
-              Prepare your fingers. Neutralize packets before they cross the red firewall!
+            <p className="text-xs sm:text-sm text-slate-400 font-mono">
+              Get ready to type falling words
             </p>
           </div>
         </div>
@@ -712,39 +672,34 @@ export const Game = () => {
 
       {/* MODAL: PAUSE MENU */}
       {gameState === 'paused' && (
-        <div className="absolute inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-slate-900 border border-slate-700 rounded-2xl p-6 sm:p-8 space-y-6 shadow-[0_0_50px_rgba(0,0,0,0.8)] text-center">
+        <div className="absolute inset-0 z-50 bg-slate-950/85 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-5 text-center">
             
-            <div className="space-y-1">
-              <span className="text-xs font-mono text-amber-400 uppercase tracking-widest">
-                STREAM SUSPENDED
-              </span>
-              <h2 className="text-2xl sm:text-3xl font-mono font-bold text-white uppercase">
-                Terminal Paused
-              </h2>
-            </div>
+            <h2 className="text-xl font-mono font-bold text-white uppercase">
+              Game Paused
+            </h2>
 
-            <div className="grid grid-cols-2 gap-3 p-4 bg-slate-950 rounded-xl border border-slate-800 text-left font-mono text-xs">
+            <div className="grid grid-cols-2 gap-3 p-3.5 bg-slate-950 rounded-xl border border-slate-800 text-left font-mono text-xs">
               <div>
-                <span className="text-slate-500">Current Score:</span>
-                <p className="text-base font-bold text-white">{score}</p>
+                <span className="text-slate-400">Score:</span>
+                <p className="text-base font-bold text-white mt-0.5">{score}</p>
               </div>
               <div>
-                <span className="text-slate-500">Current WPM:</span>
-                <p className="text-base font-bold text-cyan-400">{currentWpm}</p>
+                <span className="text-slate-400">WPM:</span>
+                <p className="text-base font-bold text-cyan-400 mt-0.5">{currentWpm}</p>
               </div>
             </div>
 
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               <button
                 type="button"
                 onClick={() => {
                   playKeyStrokeSound();
                   setGameState('playing');
                 }}
-                className="w-full py-3 rounded-xl font-mono font-bold text-sm uppercase bg-cyan-500 hover:bg-cyan-400 text-slate-950 transition-colors cursor-pointer"
+                className="w-full py-3 rounded-xl font-mono font-bold text-xs uppercase bg-cyan-500 hover:bg-cyan-400 text-slate-950 transition-colors cursor-pointer"
               >
-                Resume Terminal
+                Resume
               </button>
 
               <button
@@ -753,9 +708,9 @@ export const Game = () => {
                   playKeyStrokeSound();
                   restartGame();
                 }}
-                className="w-full py-3 rounded-xl font-mono font-semibold text-sm uppercase bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 transition-colors cursor-pointer"
+                className="w-full py-3 rounded-xl font-mono font-medium text-xs uppercase bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition-colors cursor-pointer"
               >
-                Restart Mission
+                Restart Game
               </button>
 
               <button
@@ -764,9 +719,9 @@ export const Game = () => {
                   playKeyStrokeSound();
                   navigate('/');
                 }}
-                className="w-full py-3 rounded-xl font-mono text-xs uppercase text-slate-400 hover:text-white transition-colors cursor-pointer"
+                className="w-full py-2.5 rounded-xl font-mono text-xs text-slate-400 hover:text-white transition-colors cursor-pointer"
               >
-                Abort & Return to Dashboard
+                Exit to Dashboard
               </button>
             </div>
 
@@ -774,85 +729,73 @@ export const Game = () => {
         </div>
       )}
 
-      {/* MODAL: POST-GAME SUMMARY (VICTORY / GAMEOVER) */}
+      {/* MODAL: CLEAN POST-GAME SUMMARY */}
       {(gameState === 'gameover' || gameState === 'victory') && (
-        <div className="absolute inset-0 z-50 bg-slate-950/95 backdrop-blur-lg flex items-center justify-center p-4 overflow-y-auto">
-          <div className="w-full max-w-lg bg-slate-900 border border-slate-700 rounded-2xl p-6 sm:p-8 space-y-6 shadow-[0_0_50px_rgba(0,0,0,0.9)]">
+        <div className="absolute inset-0 z-50 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-7 space-y-5">
             
-            {/* Header & Outcome */}
-            <div className="text-center space-y-2">
-              <div className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-xs font-mono border uppercase tracking-wider mb-1">
-                {gameState === 'victory' ? (
-                  <span className="text-emerald-400 border-emerald-500/40 bg-emerald-950/50 px-2 py-0.5 rounded">
-                    MISSION ACCOMPLISHED
-                  </span>
-                ) : (
-                  <span className="text-rose-400 border-rose-500/40 bg-rose-950/50 px-2 py-0.5 rounded">
-                    FIREWALL BREACHED
-                  </span>
-                )}
-              </div>
-
-              <h2 className={`text-3xl sm:text-4xl font-black font-mono uppercase tracking-tight ${
+            {/* Header */}
+            <div className="text-center space-y-1.5">
+              <h2 className={`text-2xl sm:text-3xl font-black font-mono uppercase tracking-tight ${
                 gameState === 'victory' 
                   ? 'text-transparent bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text'
                   : 'text-transparent bg-gradient-to-r from-rose-500 to-amber-500 bg-clip-text'
               }`}>
-                {gameState === 'victory' ? 'VICTORY' : 'GAME OVER'}
+                {gameState === 'victory' ? 'Victory' : 'Game Over'}
               </h2>
 
               {isNewHighScore && (
-                <div className="inline-block px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/40 text-amber-300 text-xs font-mono animate-bounce">
-                  ⭐ NEW PERSONAL HIGH SCORE!
+                <div className="inline-block px-3 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs font-mono">
+                  New High Score!
                 </div>
               )}
             </div>
 
             {/* Scoreboard Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 font-mono">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 font-mono">
               
-              <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 text-center">
-                <span className="text-[10px] text-slate-400 uppercase">FINAL SCORE</span>
-                <p className="text-xl sm:text-2xl font-bold text-cyan-400 mt-1">{score.toLocaleString()}</p>
+              <div className="bg-slate-950 p-3 rounded-xl border border-slate-800/80 text-center">
+                <span className="text-[10px] text-slate-400 uppercase">Final Score</span>
+                <p className="text-lg sm:text-xl font-bold text-cyan-400 mt-0.5">{score.toLocaleString()}</p>
               </div>
 
-              <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 text-center">
-                <span className="text-[10px] text-slate-400 uppercase">SPEED (WPM)</span>
-                <p className="text-xl sm:text-2xl font-bold text-purple-400 mt-1">{currentWpm}</p>
+              <div className="bg-slate-950 p-3 rounded-xl border border-slate-800/80 text-center">
+                <span className="text-[10px] text-slate-400 uppercase">Speed (WPM)</span>
+                <p className="text-lg sm:text-xl font-bold text-purple-400 mt-0.5">{currentWpm}</p>
               </div>
 
-              <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 text-center col-span-2 sm:col-span-1">
-                <span className="text-[10px] text-slate-400 uppercase">ACCURACY</span>
-                <p className="text-xl sm:text-2xl font-bold text-emerald-400 mt-1">{currentAccuracy}%</p>
+              <div className="bg-slate-950 p-3 rounded-xl border border-slate-800/80 text-center col-span-2 sm:col-span-1">
+                <span className="text-[10px] text-slate-400 uppercase">Accuracy</span>
+                <p className="text-lg sm:text-xl font-bold text-emerald-400 mt-0.5">{currentAccuracy}%</p>
               </div>
 
-              <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 text-center">
-                <span className="text-[10px] text-slate-400 uppercase">WORDS PURGED</span>
-                <p className="text-lg font-bold text-slate-200 mt-1">{wordsNeutralized}</p>
+              <div className="bg-slate-950 p-3 rounded-xl border border-slate-800/80 text-center">
+                <span className="text-[10px] text-slate-400 uppercase">Words Cleared</span>
+                <p className="text-base font-bold text-slate-200 mt-0.5">{wordsNeutralized}</p>
               </div>
 
-              <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 text-center">
-                <span className="text-[10px] text-slate-400 uppercase">MAX STREAK</span>
-                <p className="text-lg font-bold text-amber-400 mt-1">{Math.max(streak, maxStreak)}</p>
+              <div className="bg-slate-950 p-3 rounded-xl border border-slate-800/80 text-center">
+                <span className="text-[10px] text-slate-400 uppercase">Max Streak</span>
+                <p className="text-base font-bold text-amber-400 mt-0.5">{Math.max(streak, maxStreak)}</p>
               </div>
 
-              <div className="bg-slate-950 p-3.5 rounded-xl border border-slate-800 text-center">
-                <span className="text-[10px] text-slate-400 uppercase">MISSION TIME</span>
-                <p className="text-lg font-bold text-slate-200 mt-1">{elapsedSeconds}s</p>
+              <div className="bg-slate-950 p-3 rounded-xl border border-slate-800/80 text-center">
+                <span className="text-[10px] text-slate-400 uppercase">Duration</span>
+                <p className="text-base font-bold text-slate-200 mt-0.5">{elapsedSeconds}s</p>
               </div>
 
             </div>
 
             {/* Rank Assessment */}
-            <div className="p-3.5 bg-slate-950/70 border border-slate-800 rounded-xl flex items-center justify-between text-xs font-mono">
-              <span className="text-slate-400">Pilot Assessment:</span>
-              <span className={`px-2.5 py-1 rounded-md border font-bold ${currentRank.color}`}>
+            <div className="p-3 bg-slate-950 rounded-xl border border-slate-800/80 flex items-center justify-between text-xs font-mono">
+              <span className="text-slate-400">Rank:</span>
+              <span className={`px-2 py-0.5 rounded border font-bold text-[11px] ${currentRank.color}`}>
                 {currentRank.title}
               </span>
             </div>
 
-            {/* Actions */}
-            <div className="space-y-3 pt-2">
+            {/* Clean Actions */}
+            <div className="space-y-2.5 pt-1">
               
               <button
                 type="button"
@@ -860,20 +803,19 @@ export const Game = () => {
                   playKeyStrokeSound();
                   restartGame();
                 }}
-                className="w-full py-3.5 rounded-xl font-mono font-bold text-sm uppercase tracking-wider bg-gradient-to-r from-cyan-500 to-teal-400 hover:from-cyan-400 hover:to-teal-300 text-slate-950 transition-all cursor-pointer shadow-[0_0_20px_rgba(0,240,255,0.4)]"
+                className="w-full py-3 rounded-xl font-mono font-bold text-xs uppercase tracking-wider bg-gradient-to-r from-cyan-500 to-teal-400 hover:from-cyan-400 hover:to-teal-300 text-slate-950 transition-all cursor-pointer shadow-[0_0_15px_rgba(0,240,255,0.3)]"
               >
-                Re-Deploy (Play Again)
+                Play Again
               </button>
 
-              <div className="grid grid-cols-2 gap-3">
-                
+              <div className="grid grid-cols-2 gap-2.5">
                 <button
                   type="button"
                   onClick={() => {
                     playKeyStrokeSound();
                     navigate('/profile');
                   }}
-                  className="py-3 rounded-xl font-mono font-medium text-xs uppercase bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors cursor-pointer"
+                  className="py-2.5 rounded-xl font-mono text-xs uppercase bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors cursor-pointer"
                 >
                   View Profile
                 </button>
@@ -884,11 +826,10 @@ export const Game = () => {
                     playKeyStrokeSound();
                     navigate('/');
                   }}
-                  className="py-3 rounded-xl font-mono font-medium text-xs uppercase bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors cursor-pointer"
+                  className="py-2.5 rounded-xl font-mono text-xs uppercase bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition-colors cursor-pointer"
                 >
-                  Main Dashboard
+                  Dashboard
                 </button>
-
               </div>
 
             </div>
