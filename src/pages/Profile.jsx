@@ -1,0 +1,427 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { 
+  getStoredProfile, 
+  saveStoredProfile, 
+  getStoredStats, 
+  resetAllStoredData, 
+  computeRankTier 
+} from '../utils/storage';
+import { AvatarIcon } from '../components/Avatars';
+import { AVATARS_LIST } from '../utils/avatarsData';
+import { playKeyStrokeSound } from '../utils/sound';
+
+export const Profile = () => {
+  const navigate = useNavigate();
+  const [profile, setProfile] = useState(getStoredProfile());
+  const [stats, setStats] = useState(getStoredStats());
+
+  // Edit Mode state for user handle & bio
+  const [isEditing, setIsEditing] = useState(false);
+  const [editHandle, setEditHandle] = useState('');
+  const [editBio, setEditBio] = useState('');
+  const [selectedAvatar, setSelectedAvatar] = useState('cyber_helmet');
+  const [saveFeedback, setSaveFeedback] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+
+  useEffect(() => {
+    const loadedProfile = getStoredProfile();
+    setProfile(loadedProfile);
+    setEditHandle(loadedProfile.handle || '');
+    setEditBio(loadedProfile.bio || '');
+    setSelectedAvatar(loadedProfile.avatarId || 'cyber_helmet');
+    setStats(getStoredStats());
+  }, []);
+
+  const handleStartEdit = () => {
+    playKeyStrokeSound();
+    setEditHandle(profile.handle || '');
+    setEditBio(profile.bio || '');
+    setSelectedAvatar(profile.avatarId || 'cyber_helmet');
+    setIsEditing(true);
+  };
+
+  const handleCancelEdit = () => {
+    playKeyStrokeSound();
+    setIsEditing(false);
+    setEditHandle(profile.handle || '');
+    setEditBio(profile.bio || '');
+    setSelectedAvatar(profile.avatarId || 'cyber_helmet');
+  };
+
+  const handleSaveProfile = (e) => {
+    e.preventDefault();
+    playKeyStrokeSound();
+
+    const sanitizedHandle = editHandle.trim() || 'Pilot';
+    const sanitizedBio = editBio.trim() || 'Cyber runner active in the neural stream.';
+
+    const updated = saveStoredProfile({
+      handle: sanitizedHandle,
+      bio: sanitizedBio,
+      avatarId: selectedAvatar
+    });
+
+    setProfile(updated);
+    setIsEditing(false);
+    setSaveFeedback(true);
+    setTimeout(() => setSaveFeedback(false), 2500);
+  };
+
+  const handleResetData = () => {
+    playKeyStrokeSound();
+    const result = resetAllStoredData();
+    if (result) {
+      setProfile(result.profile);
+      setStats(result.stats);
+      setEditHandle(result.profile.handle);
+      setEditBio(result.profile.bio);
+      setSelectedAvatar(result.profile.avatarId);
+    }
+    setShowResetConfirm(false);
+  };
+
+  const rank = computeRankTier(stats);
+  const winRate = stats.gamesPlayed > 0 
+    ? Math.round((stats.victories / stats.gamesPlayed) * 100) 
+    : 0;
+
+  return (
+    <div className="min-h-[calc(100vh-4rem)] py-8 px-4 sm:px-6 lg:px-8 cyber-grid">
+      <div className="max-w-5xl mx-auto space-y-8">
+        
+        {/* Page Title & Breadcrumb */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-5">
+          <div>
+            <div className="inline-flex items-center gap-2 text-xs font-mono text-purple-400 mb-1">
+              <span>PILOT TELEMETRY</span>
+              <span>/</span>
+              <span>GRID CLEARANCE LEVEL 4</span>
+            </div>
+            <h1 className="text-3xl sm:text-4xl font-black font-mono uppercase text-white tracking-tight">
+              Pilot Profile
+            </h1>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                playKeyStrokeSound();
+                navigate('/game');
+              }}
+              className="px-4 py-2 rounded-lg bg-gradient-to-r from-cyan-500 to-teal-400 text-slate-950 font-mono font-bold text-xs uppercase tracking-wider hover:from-cyan-400 hover:to-teal-300 transition-all cursor-pointer shadow-[0_0_15px_rgba(0,240,255,0.3)]"
+            >
+              Launch Terminal
+            </button>
+          </div>
+        </div>
+
+        {/* Success Alert Feedback */}
+        {saveFeedback && (
+          <div className="p-3 bg-emerald-950/70 border border-emerald-500/50 rounded-xl text-emerald-300 font-mono text-xs flex items-center gap-2 shadow-[0_0_15px_rgba(16,185,129,0.2)] animate-fadeIn">
+            <span className="text-emerald-400 text-sm">✓</span>
+            Pilot profile credentials updated and saved to neural memory (localStorage)!
+          </div>
+        )}
+
+        {/* PILOT IDENTITY CARD */}
+        <div className="bg-slate-900/90 backdrop-blur-md rounded-2xl border border-slate-800 p-6 sm:p-8 space-y-6 shadow-[0_10px_30px_rgba(0,0,0,0.5)]">
+          
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+            
+            {/* Avatar & Identifiers */}
+            <div className="flex items-center gap-5">
+              <div className="relative group">
+                <AvatarIcon id={profile.avatarId} className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl" glow={true} />
+                <div className="absolute -bottom-1 -right-1 px-2 py-0.5 rounded bg-slate-950 border border-cyan-500/50 text-[10px] font-mono text-cyan-400 font-bold">
+                  {rank.badge}
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-3">
+                  <h2 className="text-2xl sm:text-3xl font-mono font-bold text-white tracking-wide">
+                    {profile.handle}
+                  </h2>
+                  <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-mono border font-semibold ${rank.color}`}>
+                    {rank.title}
+                  </span>
+                </div>
+
+                <p className="text-slate-400 text-xs sm:text-sm max-w-lg leading-relaxed font-sans">
+                  {profile.bio}
+                </p>
+
+                <div className="text-[10px] font-mono text-slate-400 pt-1">
+                  Active connection established via Web Storage Protocol.
+                </div>
+              </div>
+            </div>
+
+            {/* Edit / Save Toggle Trigger Button */}
+            {!isEditing && (
+              <button
+                type="button"
+                onClick={handleStartEdit}
+                className="w-full md:w-auto px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 hover:border-cyan-500/50 text-cyan-300 font-mono text-xs font-bold uppercase tracking-wider transition-all cursor-pointer flex items-center justify-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                </svg>
+                <span>Edit Credentials</span>
+              </button>
+            )}
+
+          </div>
+
+          {/* EDITABLE FIELD FORM (WHEN EDIT MODE IS ACTIVE) */}
+          {isEditing && (
+            <form onSubmit={handleSaveProfile} className="pt-6 border-t border-slate-800 space-y-6 animate-fadeIn">
+              
+              <div className="space-y-4">
+                <h3 className="text-sm font-mono font-bold uppercase text-cyan-400 flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-sm bg-cyan-400"></span>
+                  Modify Pilot Identity (Persists to LocalStorage)
+                </h3>
+
+                {/* Avatar Selection Picker */}
+                <div className="space-y-2">
+                  <label className="text-xs font-mono text-slate-400 uppercase">
+                    Select Neural Avatar Icon:
+                  </label>
+                  <div className="grid grid-cols-4 sm:grid-cols-8 gap-3">
+                    {AVATARS_LIST.map((av) => (
+                      <button
+                        key={av.id}
+                        type="button"
+                        onClick={() => {
+                          playKeyStrokeSound();
+                          setSelectedAvatar(av.id);
+                        }}
+                        className={`p-2 rounded-xl border flex flex-col items-center gap-1 transition-all cursor-pointer ${
+                          selectedAvatar === av.id
+                            ? 'border-cyan-400 bg-cyan-950/60 ring-2 ring-cyan-400/50 shadow-[0_0_15px_rgba(0,240,255,0.3)]'
+                            : 'border-slate-800 bg-slate-950/40 hover:border-slate-700'
+                        }`}
+                      >
+                        <AvatarIcon id={av.id} className="w-9 h-9" glow={false} />
+                        <span className="text-[9px] font-mono text-slate-400 truncate w-full text-center">
+                          {av.name.split(' ')[0]}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Handle Input */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-mono text-slate-400 uppercase flex items-center justify-between">
+                    <span>Pilot Call-Sign / Handle:</span>
+                    <span className="text-[10px] text-slate-400">{editHandle.length}/24 chars</span>
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={24}
+                    value={editHandle}
+                    onChange={(e) => setEditHandle(e.target.value)}
+                    placeholder="e.g. CyberRunner_99"
+                    className="w-full px-4 py-2.5 bg-slate-950 rounded-xl border border-slate-700 text-white font-mono text-sm focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400"
+                  />
+                </div>
+
+                {/* Bio Input */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-mono text-slate-400 uppercase flex items-center justify-between">
+                    <span>Pilot Bio / Mission Status:</span>
+                    <span className="text-[10px] text-slate-400">{editBio.length}/140 chars</span>
+                  </label>
+                  <textarea
+                    rows={2}
+                    maxLength={140}
+                    value={editBio}
+                    onChange={(e) => setEditBio(e.target.value)}
+                    placeholder="Describe your cybernetic mission or specialties..."
+                    className="w-full px-4 py-2.5 bg-slate-950 rounded-xl border border-slate-700 text-white font-mono text-sm focus:outline-none focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400 resize-none"
+                  />
+                </div>
+
+              </div>
+
+              {/* Edit Action Buttons */}
+              <div className="flex items-center gap-3 pt-2">
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-mono font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer shadow-[0_0_15px_rgba(0,240,255,0.4)]"
+                >
+                  Save Credentials
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCancelEdit}
+                  className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-mono text-xs uppercase tracking-wider border border-slate-700 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </div>
+
+            </form>
+          )}
+
+        </div>
+
+        {/* LIFETIME STATS METRICS GRID */}
+        <div className="space-y-4">
+          <h2 className="text-lg font-mono font-bold uppercase text-white flex items-center gap-2">
+            <span className="w-2.5 h-2.5 bg-purple-400 rounded-sm"></span>
+            Lifetime Terminal Analytics
+          </h2>
+
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            
+            <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800">
+              <span className="text-[10px] font-mono text-slate-400 uppercase">GAMES PLAYED</span>
+              <p className="text-2xl font-mono font-black text-white mt-1">{stats.gamesPlayed}</p>
+            </div>
+
+            <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800">
+              <span className="text-[10px] font-mono text-slate-400 uppercase">HIGH SCORE</span>
+              <p className="text-2xl font-mono font-black text-cyan-400 mt-1">{stats.highScore.toLocaleString()}</p>
+            </div>
+
+            <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800">
+              <span className="text-[10px] font-mono text-slate-400 uppercase">BEST WPM</span>
+              <p className="text-2xl font-mono font-black text-purple-400 mt-1">{stats.bestWpm}</p>
+            </div>
+
+            <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800">
+              <span className="text-[10px] font-mono text-slate-400 uppercase">AVG WPM</span>
+              <p className="text-2xl font-mono font-black text-teal-400 mt-1">{stats.avgWpm}</p>
+            </div>
+
+            <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800">
+              <span className="text-[10px] font-mono text-slate-400 uppercase">AVG ACCURACY</span>
+              <p className="text-2xl font-mono font-black text-emerald-400 mt-1">{stats.avgAccuracy}%</p>
+            </div>
+
+            <div className="bg-slate-900/80 p-4 rounded-xl border border-slate-800">
+              <span className="text-[10px] font-mono text-slate-400 uppercase">MAX STREAK</span>
+              <p className="text-2xl font-mono font-black text-amber-400 mt-1">{stats.highestStreak}</p>
+            </div>
+
+          </div>
+        </div>
+
+        {/* MATCH HISTORY LOG */}
+        <div className="bg-slate-900/90 rounded-2xl border border-slate-800 p-6 space-y-4">
+          
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-mono font-bold uppercase text-white flex items-center gap-2">
+              <span className="w-2.5 h-2.5 bg-emerald-400 rounded-sm"></span>
+              Recent Mission Records ({stats.recentMatches ? stats.recentMatches.length : 0})
+            </h2>
+
+            {stats.recentMatches && stats.recentMatches.length > 0 && (
+              <span className="text-xs font-mono text-slate-400">
+                Win Rate: <span className="text-emerald-400 font-bold">{winRate}%</span>
+              </span>
+            )}
+          </div>
+
+          {stats.recentMatches && stats.recentMatches.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left font-mono text-xs">
+                <thead>
+                  <tr className="border-b border-slate-800 text-slate-400 uppercase text-[10px]">
+                    <th className="py-2.5 px-3">Date</th>
+                    <th className="py-2.5 px-3">Outcome</th>
+                    <th className="py-2.5 px-3">Difficulty</th>
+                    <th className="py-2.5 px-3">Score</th>
+                    <th className="py-2.5 px-3">WPM</th>
+                    <th className="py-2.5 px-3">Accuracy</th>
+                    <th className="py-2.5 px-3">Purged</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800/60">
+                  {stats.recentMatches.map((match) => (
+                    <tr key={match.id} className="hover:bg-slate-950/40 transition-colors">
+                      <td className="py-3 px-3 text-slate-400 whitespace-nowrap">{match.date}</td>
+                      <td className="py-3 px-3">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                          match.outcome === 'Victory' 
+                            ? 'bg-emerald-950 text-emerald-400 border border-emerald-500/40' 
+                            : 'bg-rose-950 text-rose-400 border border-rose-500/40'
+                        }`}>
+                          {match.outcome}
+                        </span>
+                      </td>
+                      <td className="py-3 px-3 capitalize text-slate-300">{match.difficulty}</td>
+                      <td className="py-3 px-3 font-bold text-cyan-400">{match.score.toLocaleString()}</td>
+                      <td className="py-3 px-3 text-purple-300">{match.wpm} WPM</td>
+                      <td className="py-3 px-3 text-emerald-400">{match.accuracy}%</td>
+                      <td className="py-3 px-3 text-slate-400">{match.wordsTyped} words</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="py-8 text-center border border-dashed border-slate-800 rounded-xl space-y-2">
+              <p className="text-slate-400 font-mono text-xs">No mission telemetry records available yet.</p>
+              <button
+                type="button"
+                onClick={() => {
+                  playKeyStrokeSound();
+                  navigate('/game');
+                }}
+                className="text-cyan-400 hover:text-cyan-300 font-mono text-xs underline cursor-pointer"
+              >
+                Play your first mission now ➔
+              </button>
+            </div>
+          )}
+
+        </div>
+
+        {/* SYSTEM ACTIONS & STORAGE RESET */}
+        <div className="pt-4 flex flex-col sm:flex-row items-center justify-between gap-4 border-t border-slate-800/80 text-xs font-mono">
+          <span className="text-slate-400">
+            Neural Storage Driver: HTML5 LocalStorage (Browser Persistent)
+          </span>
+
+          {!showResetConfirm ? (
+            <button
+              type="button"
+              onClick={() => {
+                playKeyStrokeSound();
+                setShowResetConfirm(true);
+              }}
+              className="text-rose-400/80 hover:text-rose-400 hover:underline cursor-pointer"
+            >
+              Reset Lifetime Statistics & Profile
+            </button>
+          ) : (
+            <div className="flex items-center gap-2 p-2 rounded-lg bg-rose-950/60 border border-rose-500/40">
+              <span className="text-rose-300 text-[11px]">Confirm purge?</span>
+              <button
+                type="button"
+                onClick={handleResetData}
+                className="px-2 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded font-bold text-[10px] cursor-pointer"
+              >
+                Yes, Purge All
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowResetConfirm(false)}
+                className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[10px] cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+        </div>
+
+      </div>
+    </div>
+  );
+};
